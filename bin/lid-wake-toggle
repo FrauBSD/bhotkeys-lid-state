@@ -1,0 +1,30 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Toggle lid stay-awake and suspend-to-idle $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD: bhotkeys-lid-state/bin/lid-wake-toggle 2026-10-03 22:43:40 -0700 Devin Teske $
+#
+############################################################ INFORMATION
+#
+# Super+Z toggles lid stay-awake and suspend-to-idle.
+#
+############################################################ GLOBALS
+
+pgm="${0##*/}" # Program basename
+
+############################################################ MAIN
+
+set -e
+
+exec lid-policy toggle
+
+################################################################################
+# END
+################################################################################

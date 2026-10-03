@@ -1,0 +1,69 @@
+#!/bin/sh
+#
+# PROVIDE: lid_switchd
+# REQUIRE: FILESYSTEMS
+# KEYWORD: nojail shutdown
+#
+# Applies hw.acpi.lid_switch_state at boot and serves a Unix socket
+# so a session can change policy or suspend without becoming root.
+#
+# Enable in /etc/rc.conf:
+#	lid_switchd_enable="YES"
+#
+# Optional:
+#	lid_switchd_switch_state="suspend_to_idle"	# or NONE
+#	lid_switchd_socket="/var/run/lid-switchd.sock"
+#	lid_switchd_flags=""
+#
+
+. /etc/rc.subr
+
+name="lid_switchd"
+rcvar=lid_switchd_enable
+desc="ACPI lid-switch policy and suspend helper"
+
+load_rc_config $name
+
+: "${lid_switchd_enable:=NO}"
+: "${lid_switchd_switch_state:=suspend_to_idle}"
+: "${lid_switchd_socket:=/var/run/lid-switchd.sock}"
+
+command="@PREFIX@/sbin/lid-switchd"
+pidfile="/var/run/lid-switchd.pid"
+command_args="start"
+start_cmd="lid_switchd_start"
+stop_cmd="lid_switchd_stop"
+status_cmd="lid_switchd_status"
+
+lid_switchd_start()
+{
+	[ -x "$command" ] || err 1 "$command not installed"
+	export lid_switchd_switch_state
+	export lid_switchd_socket
+	/usr/sbin/daemon -f -p "$pidfile" "$command" serve
+}
+
+lid_switchd_stop()
+{
+	if [ -f "$pidfile" ]; then
+		kill "$(cat "$pidfile")" 2> /dev/null || : errors ignored
+		rm -f "$pidfile"
+	fi
+	rm -f "$lid_switchd_socket"
+	if [ -x "$command" ]; then
+		lid_switchd_socket="$lid_switchd_socket" "$command" stop ||
+			: errors ignored
+	fi
+}
+
+lid_switchd_status()
+{
+	if [ -x "$command" ]; then
+		lid_switchd_socket="$lid_switchd_socket" "$command" status
+	else
+		echo "$command not installed"
+		return 1
+	fi
+}
+
+run_rc_command "$1"

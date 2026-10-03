@@ -1,0 +1,8 @@
+id lid
+group x11/bhotkeys-lid-state
+label Lid policy
+chord Super+z
+command lid-wake-toggle
+repeat 0
+greeter 1
+desc Choose whether closing the lid sleeps or stays awake.

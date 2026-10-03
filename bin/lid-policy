@@ -1,0 +1,102 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Set the ACPI lid-switch policy $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD: bhotkeys-lid-state/bin/lid-policy 2026-10-03 22:44:36 -0700 Devin Teske $
+#
+############################################################ INFORMATION
+#
+# Talk to lid-switchd over its control socket. awake, s0ix, and
+# toggle show the new state with bosd.
+#
+#   lid-policy awake|s0ix|toggle|status|suspend-s0ix|suspend-s3
+#
+############################################################ GLOBALS
+
+pgm="${0##*/}" # Program basename
+
+SOCK="${lid_switchd_socket:-/var/run/lid-switchd.sock}"
+
+############################################################ FUNCTIONS
+
+quietly() { "$@" > /dev/null 2>&1; }
+have() { quietly command -v "$@"; }
+
+usage()
+{
+	echo "Usage: $pgm awake|s0ix|toggle|status|suspend-s0ix|suspend-s3" >&2
+	exit 2
+}
+
+lid_glyph()
+{
+	local glyph="$1"
+
+	have bosd || return 0
+	bosd "$glyph" &
+}
+
+############################################################ MAIN
+
+set -e
+
+CMD="$1"
+[ "$CMD" ] || usage
+
+case "$CMD" in
+awake|s0ix|toggle|status|suspend-s0ix|suspend-s3) : ok ;;
+*) usage
+esac
+
+if [ ! -S "$SOCK" ]; then
+	echo "$pgm: $SOCK not available (is lid-switchd running?)" >&2
+	exit 1
+fi
+
+# One shot: send command, read reply line
+reply=$( printf '%s\n' "$CMD" | nc -U -N -w 5 "$SOCK" 2> /dev/null ) ||
+	reply=
+
+reply=$( printf '%s' "$reply" | tr -d '\r' | sed -n '1p' )
+if [ ! "$reply" ] || [ "$reply" = "error" ] ||
+   [ "${reply#error:}" != "$reply" ]
+then
+	echo "$pgm: $CMD failed${reply:+ ($reply)}" >&2
+	exit 1
+fi
+
+case "$CMD" in
+awake)
+	lid_glyph lid-awake
+	;;
+s0ix)
+	lid_glyph lid-s0ix
+	;;
+toggle)
+	# Reply is the new lid_switch_state value
+	case "$reply" in
+	NONE)
+		lid_glyph lid-awake
+		;;
+	suspend_to_idle)
+		lid_glyph lid-s0ix
+		;;
+	esac
+	;;
+status)
+	printf '%s\n' "$reply"
+	;;
+esac
+
+exit 0
+
+################################################################################
+# END
+################################################################################
