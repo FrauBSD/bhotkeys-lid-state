@@ -1,4 +1,4 @@
-[//]: # ($FrauBSD: bhotkeys-lid-state/README.md 2026-10-03 22:31:53 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys-lid-state/README.md 2026-10-04 21:30:41 -0700 Devin Teske $)
 
 # bhotkeys-lid-state
 
@@ -20,6 +20,14 @@ Home: [FrauBSD/bhotkeys-lid-state](https://github.com/FrauBSD/bhotkeys-lid-state
 - `bhotkeys`
 - `bosd` for the lid glyph
 - `lid-switchd` enabled (`sysrc lid_switchd_enable="YES"`)
+
+The socket is mode 0660 and group `lid_switchd`. The service
+creates that group. Add the session account to it, then log in
+again so the new group is in the credentials:
+
+```sh
+pw groupmod lid_switchd -m user
+```
 
 ## Build / install
 

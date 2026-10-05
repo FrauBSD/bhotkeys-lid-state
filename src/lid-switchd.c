@@ -8,8 +8,9 @@
  * lid-switchd: root helper for hw.acpi.lid_switch_state.
  *
  * Boot (rc.d start): apply lid_switchd_switch_state to
- * hw.acpi.lid_switch_state, then listen on a Unix socket (0660 wheel)
- * so a session can change policy or suspend without becoming root.
+ * hw.acpi.lid_switch_state, then listen on a Unix socket (0660,
+ * group lid_switchd) so a session can change policy or suspend
+ * without becoming root.
  *
  * Line protocol (one command per connection, reply one line):
  *   awake | s0ix | toggle | status | suspend-s0ix | suspend-s3 | quit
@@ -38,12 +39,14 @@
 
 #define DEFAULT_SOCK	"/var/run/lid-switchd.sock"
 #define DEFAULT_PID	"/var/run/lid-switchd.pid"
+#define DEFAULT_GROUP	"lid_switchd"
 #define DEFAULT_STATE	"suspend_to_idle"
 #define SYSCTL_LID	"hw.acpi.lid_switch_state"
 #define SYSCTL_SUSPEND	"kern.power.suspend"
 
 static const char *sock_path = DEFAULT_SOCK;
 static const char *pid_path = DEFAULT_PID;
+static const char *sock_group = DEFAULT_GROUP;
 static volatile sig_atomic_t running = 1;
 
 static void
@@ -316,10 +319,13 @@ fix_sock_owner(void)
 {
 	struct group *gr;
 
-	gr = getgrnam("wheel");
-	if (gr != NULL)
-		(void)chown(sock_path, 0, gr->gr_gid);
-	(void)chmod(sock_path, 0660);
+	gr = getgrnam(sock_group);
+	if (gr == NULL)
+		errx(1, "group %s: not found", sock_group);
+	if (chown(sock_path, 0, gr->gr_gid) != 0)
+		err(1, "chown %s", sock_path);
+	if (chmod(sock_path, 0660) != 0)
+		err(1, "chmod %s", sock_path);
 }
 
 static int
@@ -492,6 +498,9 @@ main(int argc, char **argv)
 	env = getenv("lid_switchd_socket");
 	if (env != NULL && env[0] != '\0')
 		sock_path = env;
+	env = getenv("lid_switchd_group");
+	if (env != NULL && env[0] != '\0')
+		sock_group = env;
 
 	if (argc < 2)
 		usage();

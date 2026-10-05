@@ -13,6 +13,7 @@
 # Optional:
 #	lid_switchd_switch_state="suspend_to_idle"	# or NONE
 #	lid_switchd_socket="/var/run/lid-switchd.sock"
+#	lid_switchd_group="lid_switchd"
 #	lid_switchd_flags=""
 #
 
@@ -27,6 +28,7 @@ load_rc_config $name
 : "${lid_switchd_enable:=NO}"
 : "${lid_switchd_switch_state:=suspend_to_idle}"
 : "${lid_switchd_socket:=/var/run/lid-switchd.sock}"
+: "${lid_switchd_group:=lid_switchd}"
 
 command="@PREFIX@/sbin/lid-switchd"
 pidfile="/var/run/lid-switchd.pid"
@@ -38,8 +40,11 @@ status_cmd="lid_switchd_status"
 lid_switchd_start()
 {
 	[ -x "$command" ] || err 1 "$command not installed"
+	pw groupshow "$lid_switchd_group" > /dev/null 2>&1 ||
+		pw groupadd "$lid_switchd_group"
 	export lid_switchd_switch_state
 	export lid_switchd_socket
+	export lid_switchd_group
 	/usr/sbin/daemon -f -p "$pidfile" "$command" serve
 }
 
