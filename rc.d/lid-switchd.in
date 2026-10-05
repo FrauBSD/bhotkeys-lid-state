@@ -1,17 +1,20 @@
 #!/bin/sh
 #
 # PROVIDE: lid_switchd
-# REQUIRE: FILESYSTEMS
+# REQUIRE: FILESYSTEMS sysctl
 # KEYWORD: nojail shutdown
 #
-# Applies hw.acpi.lid_switch_state at boot and serves a Unix socket
-# so a session can change policy or suspend without becoming root.
+# Serves a Unix socket so a session can change the lid policy or suspend
+# without becoming root. The boot value of hw.acpi.lid_switch_state is whatever
+# the sysctl service applied. lid_switchd_switch_state chooses the sleep type
+# toggle writes (s0ix or s3). It does not set the sysctl but determines what
+# values are used for the sysctl when toggling.
 #
 # Enable in /etc/rc.conf:
 #	lid_switchd_enable="YES"
 #
 # Optional:
-#	lid_switchd_switch_state="suspend_to_idle"	# or NONE
+#	lid_switchd_switch_state="s0ix"	# or s3
 #	lid_switchd_socket="/var/run/lid-switchd.sock"
 #	lid_switchd_group="lid_switchd"
 #	lid_switchd_flags=""
@@ -26,7 +29,7 @@ desc="ACPI lid-switch policy and suspend helper"
 load_rc_config $name
 
 : "${lid_switchd_enable:=NO}"
-: "${lid_switchd_switch_state:=suspend_to_idle}"
+: "${lid_switchd_switch_state:=s0ix}"
 : "${lid_switchd_socket:=/var/run/lid-switchd.sock}"
 : "${lid_switchd_group:=lid_switchd}"
 

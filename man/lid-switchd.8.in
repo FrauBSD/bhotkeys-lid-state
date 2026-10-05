@@ -1,0 +1,237 @@
+.\" Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd October 5, 2026
+.Dt LID-SWITCHD 8
+.Os
+.Sh NAME
+.Nm lid-switchd
+.Nd ACPI lid-switch policy and suspend helper
+.Sh SYNOPSIS
+.Nm Cm start
+.Nm Cm stop
+.Nm Cm status
+.Nm Cm serve
+.Nm Cm awake
+.Nm Cm s0ix
+.Nm Cm s3
+.Nm Cm toggle
+.Nm Cm suspend-s0ix
+.Nm Cm suspend-s3
+.Sh DESCRIPTION
+.Nm
+is the root helper for sysctl
+.Va hw.acpi.lid_switch_state .
+The rc script starts it with
+.Cm serve ,
+after
+.Pa /etc/rc.d/sysctl
+has run.
+.Pp
+At start the daemon reads the running
+.Xr sysctl 3
+value of
+.Va hw.acpi.lid_switch_state
+and does not change it.
+It does not read
+.Xr sysctl.conf 5
+or
+.Xr rc.conf 5
+for that value.
+The sysctl boot value is whatever the
+.Cm sysctl
+service already applied, usually from
+.Xr sysctl.conf 5 .
+The administrator sets that boot value with an editor or with
+.Xr sysconf 8 .
+Set
+.Va hw.acpi.lid_switch_state
+to
+.Cm NONE
+when closing the lid should default at boot to leaving the machine up.
+For a sleep policy, set that sysctl to the name this kernel accepts:
+.Cm suspend_to_idle
+or
+.Cm s2idle ,
+or
+.Cm fw_suspend
+or
+.Cm s2mem .
+See sysctl
+.Va kern.power.supported_stype
+for a list of kernel supported policies.
+.Cm NONE
+means do nothing and is preferred over the
+.Va hw.acpi.lid_switch_state
+value
+.Cm awake .
+.Pp
+.Ev lid_switchd_switch_state
+in
+.Xr rc.conf 5
+chooses the sleep type
+.Cm toggle
+writes
+.Pq Cm s0ix or Cm s3 .
+It does not set the sysctl but rather configures how
+.Cm toggle
+alters the sysctl
+.Pq depending on your kernel .
+.Pp
+The daemon then listens on a Unix socket so a session can change
+the running policy or suspend without becoming root.
+.Pp
+The socket is mode 0660 and group
+.Cm lid_switchd .
+The rc script creates that group when it is missing.
+The daemon refuses to listen when the group is missing.
+Add the session account to the group, then log in again so the
+new group is in the credentials:
+.Bd -literal -offset indent
+pw groupmod lid_switchd -m user
+.Ed
+.Pp
+.Xr lid-policy 1
+uses the socket to send
+.Cm awake ,
+.Cm s0ix ,
+.Cm s3 ,
+and
+.Cm toggle
+to the root service the rc script started.
+One command per connection, one line back.
+The same words on the
+.Nm
+command line require the super-user and act directly.
+.Cm awake
+sets
+.Cm NONE .
+.Cm s0ix
+sets suspend-to-idle
+.Pq Cm suspend_to_idle or Cm s2idle
+and makes that the sleep type
+.Cm toggle
+writes.
+.Cm s3
+sets firmware suspend
+.Pq Cm fw_suspend or Cm s2mem
+and makes that the sleep type
+.Cm toggle
+writes.
+.Cm toggle
+flips between
+.Cm NONE
+and that sleep type.
+.Cm awake
+does not change which sleep type
+.Cm toggle
+writes.
+Each of these changes the running value of
+.Va hw.acpi.lid_switch_state
+and replies with that value.
+They do not rewrite
+.Xr rc.conf 5 .
+.Cm status
+replies with the current value.
+.Pp
+A suspend-to-idle reply is
+.Cm suspend_to_idle
+or
+.Cm s2idle .
+A firmware-suspend reply is
+.Cm fw_suspend
+or
+.Cm s2mem .
+Which word appears depends on the kernel.
+A script that reads the reply should accept both names of a type.
+It does not need the kernel version or
+.Va kern.power.supported_stype .
+.Pp
+.Cm suspend-s0ix
+sets
+.Va kern.power.suspend
+to the same type,
+runs
+.Xr zzz 8 ,
+then restores the previous suspend value.
+.Cm suspend-s3
+runs
+.Xr acpiconf 8
+.Fl s Cm 3 .
+Those two reply
+.Cm ok
+or
+.Cm error .
+.Cm quit
+replies
+.Cm bye
+and the daemon exits.
+.Pp
+Enable the service with
+.Dl sysrc lid_switchd_enable=YES
+and start it with
+.Dl service lid_switchd start
+.Sh ENVIRONMENT
+.Bl -tag -width "lid_switchd_switch_state"
+.It Ev lid_switchd_switch_state
+Sleep type
+.Cm toggle
+writes when the lid state is
+.Cm NONE .
+.Cm s0ix
+is the default and selects suspend-to-idle.
+.Cm s3
+selects firmware suspend.
+.Cm s0ix
+and
+.Cm s3
+on the socket change this for the running service.
+The value is read at start and is not rewritten.
+.It Ev lid_switchd_socket
+Control socket.
+The default is
+.Pa /var/run/lid-switchd.sock .
+.It Ev lid_switchd_group
+Socket group.
+The default is
+.Cm lid_switchd .
+.El
+.Sh FILES
+.Bl -tag -width "@PREFIX@/etc/rc.d/lid-switchd"
+.It Pa @PREFIX@/etc/rc.d/lid-switchd
+The rc script.
+.It Pa @PREFIX@/sbin/lid-switchd
+The daemon.
+.It Pa /var/run/lid-switchd.sock
+The control socket.
+.It Pa /var/run/lid-switchd.pid
+The process id.
+.It Pa /etc/rc.conf
+.Ev lid_switchd_switch_state ,
+the sleep type
+.Cm toggle
+uses.
+The daemon does not rewrite this file.
+.It Pa /etc/sysctl.conf
+Initial value of
+.Va hw.acpi.lid_switch_state
+.Pq stay awake, or the sleep type .
+The daemon does not read or rewrite this file.
+.El
+.Sh EXIT STATUS
+.Cm serve
+runs until
+.Cm quit
+or a signal.
+A missing group, a failure to read the current lid state, or a
+failure to bind the socket exits non-zero.
+.Sh SEE ALSO
+.Xr bhotkeys 1 ,
+.Xr lid-policy 1 ,
+.Xr sysctl.conf 5 ,
+.Xr acpiconf 8 ,
+.Xr sysconf 8 ,
+.Xr zzz 8
+.Sh AUTHORS
+.An Devin Teske Aq Mt dteske@FreeBSD.org

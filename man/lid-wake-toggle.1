@@ -1,0 +1,35 @@
+.\" Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd October 5, 2026
+.Dt LID-WAKE-TOGGLE 1
+.Os
+.Sh NAME
+.Nm lid-wake-toggle
+.Nd toggle lid stay-awake and suspend-to-idle
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+runs
+.Xr lid-policy 1
+.Cm toggle .
+The usual chord is
+.Sy Super+Z .
+Stay-awake is
+.Cm NONE .
+The other state is the sleep type
+.Xr lid-switchd 8
+is using: suspend-to-idle, or firmware suspend when
+.Ev lid_switchd_switch_state
+is
+.Cm s3 .
+.Sh EXIT STATUS
+The exit status is that of
+.Xr lid-policy 1 .
+.Sh SEE ALSO
+.Xr lid-policy 1 ,
+.Xr lid-switchd 8
+.Sh AUTHORS
+.An Devin Teske Aq Mt dteske@FreeBSD.org

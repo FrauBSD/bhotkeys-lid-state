@@ -9,14 +9,14 @@
 #
 # $Title: Set the ACPI lid-switch policy $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys-lid-state/bin/lid-policy 2026-10-03 22:44:36 -0700 Devin Teske $
+# $FrauBSD: bhotkeys-lid-state/bin/lid-policy 2026-10-05 12:20:35 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
 # Talk to lid-switchd over its control socket. awake, s0ix, and
 # toggle show the new state with bosd.
 #
-#   lid-policy awake|s0ix|toggle|status|suspend-s0ix|suspend-s3
+#   lid-policy awake|s0ix|s3|toggle|status|suspend-s0ix|suspend-s3
 #
 ############################################################ GLOBALS
 
@@ -31,7 +31,8 @@ have() { quietly command -v "$@"; }
 
 usage()
 {
-	echo "Usage: $pgm awake|s0ix|toggle|status|suspend-s0ix|suspend-s3" >&2
+	exec >&2
+	echo "Usage: $pgm awake|s0ix|s3|toggle|status|suspend-s0ix|suspend-s3"
 	exit 2
 }
 
@@ -51,7 +52,7 @@ CMD="$1"
 [ "$CMD" ] || usage
 
 case "$CMD" in
-awake|s0ix|toggle|status|suspend-s0ix|suspend-s3) : ok ;;
+awake|s0ix|s3|toggle|status|suspend-s0ix|suspend-s3) : ok ;;
 *) usage
 esac
 
@@ -76,16 +77,17 @@ case "$CMD" in
 awake)
 	lid_glyph lid-awake
 	;;
-s0ix)
+s0ix|s3)
 	lid_glyph lid-s0ix
 	;;
 toggle)
 	# Reply is the new lid_switch_state value
+	# NONE is the awake glyph; either sleep type is the other glyph
 	case "$reply" in
 	NONE)
 		lid_glyph lid-awake
 		;;
-	suspend_to_idle)
+	suspend_to_idle|s2idle|fw_suspend|s2mem)
 		lid_glyph lid-s0ix
 		;;
 	esac

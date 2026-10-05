@@ -1,0 +1,105 @@
+.\" Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd October 5, 2026
+.Dt LID-POLICY 1
+.Os
+.Sh NAME
+.Nm lid-policy
+.Nd set the ACPI lid-switch policy
+.Sh SYNOPSIS
+.Nm Cm awake
+.Nm Cm s0ix
+.Nm Cm s3
+.Nm Cm toggle
+.Nm Cm status
+.Nm Cm suspend-s0ix
+.Nm Cm suspend-s3
+.Sh DESCRIPTION
+.Nm
+sends one command to
+.Xr lid-switchd 8
+and reads one line back.
+.Cm awake
+sets
+.Va hw.acpi.lid_switch_state
+to
+.Cm NONE
+and shows the awake glyph.
+.Cm s0ix
+sets it to suspend-to-idle
+.Pq Cm suspend_to_idle or Cm s2idle ,
+shows the sleep glyph, and makes that the type
+.Cm toggle
+writes.
+.Cm s3
+sets it to firmware suspend
+.Pq Cm fw_suspend or Cm s2mem ,
+shows the same sleep glyph, and makes that the type
+.Cm toggle
+writes.
+.Cm toggle
+flips between
+.Cm NONE
+and that sleep type and shows the glyph for the new state.
+.Cm awake
+shows the awake glyph and does not change which sleep type
+.Cm toggle
+writes.
+.Cm status
+prints the current value and does not show a glyph.
+Suspend-to-idle is reported as
+.Cm suspend_to_idle
+or
+.Cm s2idle .
+Firmware suspend is reported as
+.Cm fw_suspend
+or
+.Cm s2mem .
+Which word is printed depends on the kernel.
+A script that reads this output should accept both names of a type so that
+it does not need the kernel version or
+.Va kern.power.supported_stype .
+.Pp
+.Cm suspend-s0ix
+and
+.Cm suspend-s3
+ask the daemon to suspend now.
+They do not show a glyph.
+.Pp
+The glyph is
+.Xr bosd 1
+.Cm lid-awake
+or
+.Cm lid-s0ix .
+When
+.Nm bosd
+is not in
+.Ev PATH ,
+the policy still changes.
+.Pp
+The socket is
+.Ev lid_switchd_socket ,
+or
+.Pa /var/run/lid-switchd.sock
+when that is unset.
+.Sh ENVIRONMENT
+.Bl -tag -width "lid_switchd_socket"
+.It Ev lid_switchd_socket
+Control socket.
+The default is
+.Pa /var/run/lid-switchd.sock .
+.El
+.Sh EXIT STATUS
+.Nm
+exits 0 when the daemon accepts the command.
+It exits 1 when the socket is missing or the reply is an error.
+A missing or unknown argument exits 2.
+.Sh SEE ALSO
+.Xr bhotkeys 1 ,
+.Xr bosd 1 ,
+.Xr lid-wake-toggle 1 ,
+.Xr lid-switchd 8
+.Sh AUTHORS
+.An Devin Teske Aq Mt dteske@FreeBSD.org

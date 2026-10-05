@@ -1,2 +1,3 @@
 sbin/lid-switchd
 rc.d/lid-switchd
+man/lid-switchd.8

@@ -7,17 +7,22 @@
 /*
  * lid-switchd: root helper for hw.acpi.lid_switch_state.
  *
- * Boot (rc.d start): apply lid_switchd_switch_state to
- * hw.acpi.lid_switch_state, then listen on a Unix socket (0660,
- * group lid_switchd) so a session can change policy or suspend
- * without becoming root.
+ * Boot (rc.d start): read the running hw.acpi.lid_switch_state and leave it.
+ * The boot value is whatever the sysctl service already applied, usually from
+ * sysctl.conf.  This daemon does not read or write that value from sysctl.conf
+ * or rc.conf.  lid_switchd_switch_state (s0ix or s3) chooses which sleep type
+ * toggle writes.  s0ix and s3 commands change that choice in the running
+ * process and do not rewrite rc.conf.  S4 (fw_hibernate / hibernate) is the
+ * same shape and is not wired.  Then listen on a Unix socket (0660, group
+ * lid_switchd) so a session can change the running policy or suspend without
+ * becoming root.
  *
  * Line protocol (one command per connection, reply one line):
- *   awake | s0ix | toggle | status | suspend-s0ix | suspend-s3 | quit
+ *   awake | s0ix | s3 | toggle | status | suspend-s0ix | suspend-s3 | quit
  *
  * Usage:
  *   lid-switchd start|stop|status|serve
- *   lid-switchd awake|s0ix|toggle|status|suspend-s0ix|suspend-s3
+ *   lid-switchd awake|s0ix|s3|toggle|status|suspend-s0ix|suspend-s3
  *     (direct, when already root; also used internally)
  */
 #include <sys/param.h>
@@ -40,9 +45,21 @@
 #define DEFAULT_SOCK	"/var/run/lid-switchd.sock"
 #define DEFAULT_PID	"/var/run/lid-switchd.pid"
 #define DEFAULT_GROUP	"lid_switchd"
-#define DEFAULT_STATE	"suspend_to_idle"
 #define SYSCTL_LID	"hw.acpi.lid_switch_state"
 #define SYSCTL_SUSPEND	"kern.power.suspend"
+#define SYSCTL_STYPE	"kern.power.supported_stype"
+
+/*
+ * https://reviews.freebsd.org/D56920 renamed the suspend-to-idle sleep type
+ * from "s2idle" to "suspend_to_idle".  lid_switch_state and kern.power.suspend
+ * take whichever of those names this kernel lists in
+ * kern.power.supported_stype.  The same revision renamed "s2mem" to
+ * "fw_suspend".  NONE is also a valid lid_switch_state.  It means do nothing,
+ * and it is preferred over "awake".
+ */
+static char s0ix_kw[32];
+static char s3_kw[32];
+static int moon_s3;
 
 static const char *sock_path = DEFAULT_SOCK;
 static const char *pid_path = DEFAULT_PID;
@@ -140,43 +157,85 @@ sysctl_set(const char *oid, const char *val)
 }
 
 static int
-sysrc_set_state(const char *val)
+word_in(const char *list, const char *word)
 {
-	char arg[128];
-	pid_t pid;
-	int status;
+	const char *p;
+	size_t n;
 
-	if (snprintf(arg, sizeof(arg), "lid_switchd_switch_state=%s",
-	    val) >= (int)sizeof(arg))
-		return (-1);
-	pid = fork();
-	if (pid < 0)
-		return (-1);
-	if (pid == 0) {
-		execl("/usr/sbin/sysrc", "sysrc", "-f", "/etc/rc.conf", arg,
-		    (char *)NULL);
-		_exit(127);
+	n = strlen(word);
+	p = list;
+	while ((p = strstr(p, word)) != NULL) {
+		if ((p == list || p[-1] == ' ') &&
+		    (p[n] == '\0' || p[n] == ' '))
+			return (1);
+		p += n;
 	}
-	while (waitpid(pid, &status, 0) < 0) {
-		if (errno != EINTR)
-			return (-1);
-	}
-	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-		return (-1);
 	return (0);
 }
 
 static int
-persist_and_apply(const char *state)
+load_stypes(void)
 {
-	if (strcmp(state, "NONE") != 0 &&
-	    strcmp(state, "suspend_to_idle") != 0)
+	char list[128];
+
+	if (s0ix_kw[0] != '\0' || s3_kw[0] != '\0')
+		return (0);
+	if (sysctl_get(SYSCTL_STYPE, list, sizeof(list)) != 0)
 		return (-1);
-	if (sysctl_set(SYSCTL_LID, state) != 0)
-		return (-1);
-	if (sysrc_set_state(state) != 0)
-		warnx("sysrc persist failed for %s (sysctl applied)", state);
+	if (word_in(list, "suspend_to_idle"))
+		strlcpy(s0ix_kw, "suspend_to_idle", sizeof(s0ix_kw));
+	else if (word_in(list, "s2idle"))
+		strlcpy(s0ix_kw, "s2idle", sizeof(s0ix_kw));
+	if (word_in(list, "fw_suspend"))
+		strlcpy(s3_kw, "fw_suspend", sizeof(s3_kw));
+	else if (word_in(list, "s2mem"))
+		strlcpy(s3_kw, "s2mem", sizeof(s3_kw));
 	return (0);
+}
+
+static int
+s0ix_keyword(const char **out)
+{
+
+	if (load_stypes() != 0 || s0ix_kw[0] == '\0')
+		return (-1);
+	*out = s0ix_kw;
+	return (0);
+}
+
+/* Sleep type toggle writes when the lid state is NONE */
+static int
+moon_keyword(const char **out)
+{
+
+	if (load_stypes() != 0)
+		return (-1);
+	if (moon_s3) {
+		if (s3_kw[0] == '\0')
+			return (-1);
+		*out = s3_kw;
+	} else {
+		if (s0ix_kw[0] == '\0')
+			return (-1);
+		*out = s0ix_kw;
+	}
+	return (0);
+}
+
+static void
+moon_from_env(void)
+{
+	const char *e;
+
+	e = getenv("lid_switchd_switch_state");
+	if (e == NULL || e[0] == '\0' || strcmp(e, "s0ix") == 0)
+		moon_s3 = 0;
+	else if (strcmp(e, "s3") == 0)
+		moon_s3 = 1;
+	else {
+		warnx("invalid lid_switchd_switch_state=%s; using s0ix", e);
+		moon_s3 = 0;
+	}
 }
 
 static int
@@ -188,7 +247,19 @@ do_status(char *out, size_t outsz)
 static int
 do_awake(char *out, size_t outsz)
 {
-	if (persist_and_apply("NONE") != 0)
+	if (sysctl_set(SYSCTL_LID, "NONE") != 0)
+		return (-1);
+	return (do_status(out, outsz));
+}
+
+static int
+do_moon(char *out, size_t outsz)
+{
+	const char *kw;
+
+	if (moon_keyword(&kw) != 0)
+		return (-1);
+	if (sysctl_set(SYSCTL_LID, kw) != 0)
 		return (-1);
 	return (do_status(out, outsz));
 }
@@ -196,9 +267,17 @@ do_awake(char *out, size_t outsz)
 static int
 do_s0ix(char *out, size_t outsz)
 {
-	if (persist_and_apply("suspend_to_idle") != 0)
-		return (-1);
-	return (do_status(out, outsz));
+
+	moon_s3 = 0;
+	return (do_moon(out, outsz));
+}
+
+static int
+do_s3(char *out, size_t outsz)
+{
+
+	moon_s3 = 1;
+	return (do_moon(out, outsz));
 }
 
 static int
@@ -209,7 +288,7 @@ do_toggle(char *out, size_t outsz)
 	if (do_status(cur, sizeof(cur)) != 0)
 		return (-1);
 	if (strcmp(cur, "NONE") == 0)
-		return (do_s0ix(out, outsz));
+		return (do_moon(out, outsz));
 	return (do_awake(out, outsz));
 }
 
@@ -243,6 +322,7 @@ do_suspend_s3(char *out, size_t outsz)
 static int
 do_suspend_s0ix(char *out, size_t outsz)
 {
+	const char *kw;
 	char old[64];
 	pid_t pid;
 	int status;
@@ -250,8 +330,10 @@ do_suspend_s0ix(char *out, size_t outsz)
 
 	if (sysctl_get(SYSCTL_SUSPEND, old, sizeof(old)) != 0)
 		return (-1);
+	if (s0ix_keyword(&kw) != 0)
+		return (-1);
 	warnx("requesting S0ix (was kern.power.suspend=%s)", old);
-	if (sysctl_set(SYSCTL_SUSPEND, "suspend_to_idle") != 0)
+	if (sysctl_set(SYSCTL_SUSPEND, kw) != 0)
 		return (-1);
 	pid = fork();
 	if (pid < 0) {
@@ -286,6 +368,8 @@ handle_cmd(const char *cmd, char *out, size_t outsz)
 		return (do_awake(out, outsz) == 0 ? 0 : -1);
 	if (strcmp(cmd, "s0ix") == 0)
 		return (do_s0ix(out, outsz) == 0 ? 0 : -1);
+	if (strcmp(cmd, "s3") == 0)
+		return (do_s3(out, outsz) == 0 ? 0 : -1);
 	if (strcmp(cmd, "toggle") == 0)
 		return (do_toggle(out, outsz) == 0 ? 0 : -1);
 	if (strcmp(cmd, "status") == 0)
@@ -401,34 +485,21 @@ serve_loop(void)
 	return (0);
 }
 
-static const char *
-rc_state_default(void)
-{
-	const char *e;
-
-	e = getenv("lid_switchd_switch_state");
-	if (e != NULL && e[0] != '\0')
-		return (e);
-	return (DEFAULT_STATE);
-}
-
 static int
 cmd_start_foreground(void)
 {
-	const char *state;
+	const char *kw;
+	char cur[64];
 
 	if (geteuid() != 0)
 		errx(1, "must run as root");
-	state = rc_state_default();
-	if (strcmp(state, "NONE") != 0 &&
-	    strcmp(state, "suspend_to_idle") != 0) {
-		warnx("invalid lid_switchd_switch_state=%s; using %s",
-		    state, DEFAULT_STATE);
-		state = DEFAULT_STATE;
-	}
-	if (sysctl_set(SYSCTL_LID, state) != 0)
-		err(1, "sysctl %s=%s", SYSCTL_LID, state);
-	warnx("applied %s=%s; serving %s", SYSCTL_LID, state, sock_path);
+	if (moon_keyword(&kw) != 0)
+		errx(1, "no %s sleep type in %s",
+		    moon_s3 ? "S3" : "suspend-to-idle", SYSCTL_STYPE);
+	if (sysctl_get(SYSCTL_LID, cur, sizeof(cur)) != 0)
+		err(1, "sysctl %s", SYSCTL_LID);
+	warnx("%s=%s; toggle writes %s; serving %s",
+	    SYSCTL_LID, cur, kw, sock_path);
 	return (serve_loop());
 }
 
@@ -483,7 +554,7 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: lid-switchd start|stop|status|serve\n"
-	    "       lid-switchd awake|s0ix|toggle|status|"
+	    "       lid-switchd awake|s0ix|s3|toggle|status|"
 	    "suspend-s0ix|suspend-s3\n");
 	exit(1);
 }
@@ -504,6 +575,7 @@ main(int argc, char **argv)
 
 	if (argc < 2)
 		usage();
+	moon_from_env();
 
 	if (strcmp(argv[1], "start") == 0 || strcmp(argv[1], "serve") == 0)
 		return (cmd_start_foreground());
