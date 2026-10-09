@@ -43,8 +43,6 @@ status_cmd="lid_switchd_status"
 lid_switchd_start()
 {
 	[ -x "$command" ] || err 1 "$command not installed"
-	pw groupshow "$lid_switchd_group" > /dev/null 2>&1 ||
-		pw groupadd "$lid_switchd_group"
 	export lid_switchd_switch_state
 	export lid_switchd_socket
 	export lid_switchd_group

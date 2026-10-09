@@ -1,10 +1,15 @@
-[//]: # ($FrauBSD: bhotkeys-lid-state/CHANGELOG.md 2026-10-05 12:20:35 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys-lid-state/CHANGELOG.md 2026-10-09 13:49:18 -0700 Devin Teske $)
 
 # Changelog
 
 Newest first. Each section is a git tag; the bullets are what landed
 in that tag (from the previous tag, or from the start of the
 repository for 1.0).
+
+## 1.3 (2026-10-09)
+
+- installing the package creates group `lid_switchd`; the rc
+  script no longer creates it
 
 ## 1.2 (2026-10-05)
 
