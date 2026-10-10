@@ -2,7 +2,7 @@
 .\"
 .\" SPDX-License-Identifier: BSD-2-Clause
 .\"
-.Dd October 9, 2026
+.Dd October 10, 2026
 .Dt LID-SWITCHD 8
 .Os
 .Sh NAME
@@ -171,7 +171,7 @@ and the daemon exits.
 Enable the service with
 .Dl sysrc lid_switchd_enable=YES
 and start it with
-.Dl service lid_switchd start
+.Dl service lid-switchd start
 .Sh ENVIRONMENT
 .Bl -tag -width "lid_switchd_switch_state"
 .It Ev lid_switchd_switch_state

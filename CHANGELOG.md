@@ -1,10 +1,14 @@
-[//]: # ($FrauBSD: bhotkeys-lid-state/CHANGELOG.md 2026-10-09 13:49:18 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys-lid-state/CHANGELOG.md 2026-10-10 08:24:36 -0700 Devin Teske $)
 
 # Changelog
 
 Newest first. Each section is a git tag; the bullets are what landed
 in that tag (from the previous tag, or from the start of the
 repository for 1.0).
+
+## 1.3.1 (2026-10-09)
+
+- fix typo in lid-switchd(8)
 
 ## 1.3 (2026-10-09)
 
