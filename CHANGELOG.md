@@ -1,10 +1,14 @@
-[//]: # ($FrauBSD: bhotkeys-lid-state/CHANGELOG.md 2026-10-10 08:24:36 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys-lid-state/CHANGELOG.md 2026-10-17 10:40:30 -0700 unknown $)
 
 # Changelog
 
 Newest first. Each section is a git tag; the bullets are what landed
 in that tag (from the previous tag, or from the start of the
 repository for 1.0).
+
+## 1.3.2 (2026-10-17)
+
+- Provide OSD feedback to user when lid-switchd service is not running
 
 ## 1.3.1 (2026-10-09)
 

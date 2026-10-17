@@ -9,12 +9,13 @@
 #
 # $Title: Set the ACPI lid-switch policy $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys-lid-state/bin/lid-policy 2026-10-05 12:20:35 -0700 Devin Teske $
+# $FrauBSD: bhotkeys-lid-state/bin/lid-policy 2026-10-17 10:40:30 -0700 unknown $
 #
 ############################################################ INFORMATION
 #
 # Talk to lid-switchd over its control socket. awake, s0ix, and
-# toggle show the new state with bosd.
+# toggle show the new state with bosd. A missing socket shows a red
+# caption that lid-switchd is not running. status does not.
 #
 #   lid-policy awake|s0ix|s3|toggle|status|suspend-s0ix|suspend-s3
 #
@@ -23,6 +24,8 @@
 pgm="${0##*/}" # Program basename
 
 SOCK="${lid_switchd_socket:-/var/run/lid-switchd.sock}"
+
+WARN_COLOR="#cb1008" # FreeBSD Red
 
 ############################################################ FUNCTIONS
 
@@ -44,6 +47,14 @@ lid_glyph()
 	bosd "$glyph" &
 }
 
+# Red caption when lid-switchd is not listening
+service_missing()
+{
+	have bosd || return 0
+	bosd -F "$WARN_COLOR" -t \
+		'lid-switchd\x20is\x20not\x20running; see lid-switchd(8)' &
+}
+
 ############################################################ MAIN
 
 set -e
@@ -58,6 +69,8 @@ esac
 
 if [ ! -S "$SOCK" ]; then
 	echo "$pgm: $SOCK not available (is lid-switchd running?)" >&2
+	# status is a query; the hotkey and the other verbs get the caption
+	[ "$CMD" = status ] || service_missing
 	exit 1
 fi
 

@@ -2,7 +2,7 @@
 .\"
 .\" SPDX-License-Identifier: BSD-2-Clause
 .\"
-.Dd October 5, 2026
+.Dd October 17, 2026
 .Dt LID-POLICY 1
 .Os
 .Sh NAME
@@ -84,6 +84,13 @@ The socket is
 or
 .Pa /var/run/lid-switchd.sock
 when that is unset.
+When the socket is missing, commands other than
+.Cm status
+show a red caption through
+.Xr bosd 1
+that
+.Nm lid-switchd
+is not running.
 .Sh ENVIRONMENT
 .Bl -tag -width "lid_switchd_socket"
 .It Ev lid_switchd_socket
