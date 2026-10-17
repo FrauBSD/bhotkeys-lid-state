@@ -9,7 +9,7 @@
 #
 # $Title: Set the ACPI lid-switch policy $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys-lid-state/bin/lid-policy 2026-10-17 10:40:30 -0700 unknown $
+# $FrauBSD: bhotkeys-lid-state/bin/lid-policy 2026-10-17 11:06:34 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -19,12 +19,15 @@
 #
 #   lid-policy awake|s0ix|s3|toggle|status|suspend-s0ix|suspend-s3
 #
+############################################################ ENVIRONMENT
+
+SOCK="${lid_switchd_socket:-/var/run/lid-switchd.sock}"
+
 ############################################################ GLOBALS
 
 pgm="${0##*/}" # Program basename
 
-SOCK="${lid_switchd_socket:-/var/run/lid-switchd.sock}"
-
+WARN='lid-switchd\x20is\x20not\x20running;\x20see\x20lid-switchd(8)'
 WARN_COLOR="#cb1008" # FreeBSD Red
 
 ############################################################ FUNCTIONS
@@ -51,8 +54,7 @@ lid_glyph()
 service_missing()
 {
 	have bosd || return 0
-	bosd -F "$WARN_COLOR" -t \
-		'lid-switchd\x20is\x20not\x20running; see lid-switchd(8)' &
+	bosd -F "$WARN_COLOR" -t "$WARN" &
 }
 
 ############################################################ MAIN
