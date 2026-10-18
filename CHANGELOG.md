@@ -1,4 +1,4 @@
-[//]: # ($FrauBSD: bhotkeys-lid-state/CHANGELOG.md 2026-10-18 04:41:22 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys-lid-state/CHANGELOG.md 2026-10-18 04:57:06 -0700 Devin Teske $)
 
 # Changelog
 
@@ -12,6 +12,7 @@ repository for 1.0).
 - Simplify lid-wake-toggle script
 - Adjust whitespace in rc.d/lid-switchd[.in]
 - Create lid-switchd service pidfile 0644
+- Provide OSD feedback to user when lid-switchd socket is unwritable
 
 ## 1.3.1 (2026-10-09)
 

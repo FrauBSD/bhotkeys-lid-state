@@ -9,13 +9,14 @@
 #
 # $Title: Set the ACPI lid-switch policy $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys-lid-state/bin/lid-policy 2026-10-17 11:06:34 -0700 Devin Teske $
+# $FrauBSD: bhotkeys-lid-state/bin/lid-policy 2026-10-18 04:57:06 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
 # Talk to lid-switchd over its control socket. awake, s0ix, and
 # toggle show the new state with bosd. A missing socket shows a red
-# caption that lid-switchd is not running. status does not.
+# caption that lid-switchd is not running. An unwritable socket
+# shows a red caption for that. status shows neither.
 #
 #   lid-policy awake|s0ix|s3|toggle|status|suspend-s0ix|suspend-s3
 #
@@ -27,7 +28,10 @@ SOCK="${lid_switchd_socket:-/var/run/lid-switchd.sock}"
 
 pgm="${0##*/}" # Program basename
 
-WARN='lid-switchd\x20is\x20not\x20running;\x20see\x20lid-switchd(8)'
+WARN_XREF=';\x20see\x20lid-switchd(8)'
+WARN_PERM='lid-switchd\x20socket\x20is\x20not\x20writable'"$WARN_XREF"
+WARN_SERV='lid-switchd\x20is\x20not\x20running'"$WARN_XREF"
+
 WARN_COLOR="#cb1008" # FreeBSD Red
 
 ############################################################ FUNCTIONS
@@ -54,7 +58,14 @@ lid_glyph()
 service_missing()
 {
 	have bosd || return 0
-	bosd -F "$WARN_COLOR" -t "$WARN" &
+	bosd -F "$WARN_COLOR" -t "$WARN_SERV" &
+}
+
+# Red caption when the socket exists but is not writable
+socket_unwritable()
+{
+	have bosd || return 0
+	bosd -F "$WARN_COLOR" -t "$WARN_PERM" &
 }
 
 ############################################################ MAIN
@@ -73,6 +84,11 @@ if [ ! -S "$SOCK" ]; then
 	echo "$pgm: $SOCK not available (is lid-switchd running?)" >&2
 	# status is a query; the hotkey and the other verbs get the caption
 	[ "$CMD" = status ] || service_missing
+	exit 1
+fi
+if [ ! -w "$SOCK" ]; then
+	echo "$pgm: $SOCK not writable" >&2
+	[ "$CMD" = status ] || socket_unwritable
 	exit 1
 fi
 
