@@ -9,19 +9,13 @@
 #
 # $Title: Toggle lid stay-awake and suspend-to-idle $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys-lid-state/bin/lid-wake-toggle 2026-10-03 22:43:40 -0700 Devin Teske $
+# $FrauBSD: bhotkeys-lid-state/bin/lid-wake-toggle 2026-10-18 04:24:37 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
 # Super+Z toggles lid stay-awake and suspend-to-idle.
 #
-############################################################ GLOBALS
-
-pgm="${0##*/}" # Program basename
-
 ############################################################ MAIN
-
-set -e
 
 exec lid-policy toggle
 
