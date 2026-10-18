@@ -52,7 +52,7 @@ lid_switchd_start()
 lid_switchd_stop()
 {
 	if [ -f "$pidfile" ]; then
-		kill "$(cat "$pidfile")" 2> /dev/null || : errors ignored
+		kill "$( cat "$pidfile" )" 2> /dev/null || : errors ignored
 		rm -f "$pidfile"
 	fi
 	rm -f "$lid_switchd_socket"
